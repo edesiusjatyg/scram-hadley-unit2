@@ -28,4 +28,29 @@ A terminal-style BWR reactor shift simulation game. Full PRD and physics researc
 - Terminal color palette: bg `#0a0a0a`, text `#33ff33`, alarm `#ff4444`, warning `#ffaa00`
 - No gradients, no shadows, no rounded corners, no icons
 - Every UI element must feel like a 1980s control room terminal
+
+## Handoff protocol (MANDATORY)
+Every agent MUST do this before ending a session:
+
+1. Open `CHANGES.md` in the workspace root (create if not exists)
+2. Append a new entry using this format:
+
+[DATE] — [TASK NAME]
+Completed
+
+[bullet list of what was built/changed, with file paths]
+
+State of the codebase
+
+[current working state — what runs, what doesn't]
+
+Next agent must do
+
+[ordered list of next steps, specific enough to act on immediately]
+
+Known issues / blockers
+
+[anything broken, untested, or requires decision before proceeding]
+
+3. Never end a session without updating CHANGES.md — this is the single source of truth for project continuity.
 <!-- END:scram-project-rules -->
