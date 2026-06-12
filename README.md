@@ -1,5 +1,7 @@
 # SCRAM: Hadley Unit 2
 
+![SCRAM: Hadley Unit 2 Game Screenshot](public/game_screenshot.png)
+
 **SCRAM: Hadley Unit 2** is a hardcore, terminal-based Boiling Water Reactor (BWR) control room simulation game. Step into the shoes of the Reactor Operator on the 0342 night shift. Your task is to maintain core stability, interpret noisy instrument readings, triage cascading alarms under intense time pressure, and manage complex system interactions to avoid a catastrophic meltdown.
 
 ## Overview
