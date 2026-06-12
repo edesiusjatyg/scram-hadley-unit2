@@ -1,26 +1,46 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --term-bg: #0a0a0a;
+  --term-text: #33ff33;
+  --term-alarm: #ff4444;
+  --term-warning: #ffaa00;
+  --term-dim: #1a7a1a;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--term-bg);
+  color: var(--term-text);
+  font-family: 'Courier New', Courier, monospace;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Full viewport, no scrolling on outer */
+  text-transform: uppercase;
+}
+
+::selection {
+  background: var(--term-text);
+  color: var(--term-bg);
+}
+
+.blink {
+  animation: blinker 1s linear infinite;
+}
+
+@keyframes blinker {
+  50% {
+    opacity: 0;
+  }
+}
+
+.fast-blink {
+  animation: fast-blinker 0.5s linear infinite;
+}
+
+@keyframes fast-blinker {
+  50% {
+    opacity: 0;
+  }
 }
