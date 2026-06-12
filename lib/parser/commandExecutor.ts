@@ -13,8 +13,23 @@ export function executeCommand(cmd: ParsedCommand, state: PlantState): CommandRe
     return { nextState, response: cmd.errorMessage || 'INVALID COMMAND' };
   }
 
-  // Helper
   const formatTime = (mins: number) => `${Math.floor(mins/60).toString().padStart(2,'0')}:${(mins%60).toString().padStart(2,'0')}`;
+
+  // Handle ARO Delegation
+  if (cmd.verb === 'TELL' && cmd.target === 'ARO') {
+    // Basic implementation: we parse the rest of the command as a string, but the parser might not handle it well unless we change the parser.
+    // For now, let's assume the parser just passes the rest as value or we handle it in pendingAroCommand.
+    return { nextState, response: 'ARO: "I am ready for commands, but TELL ARO requires the raw command string parser update." (Not fully implemented)' };
+  }
+  
+  if (cmd.verb === 'ASK' && cmd.target === 'ARO') {
+    return { nextState, response: 'ARO: "RPV Level is ' + nextState.instruments.rpvWaterLevel.displayValue + '%. RPV Pressure is ' + nextState.instruments.rpvPressure.displayValue + ' MPa."' };
+  }
+
+  // Handle Auth
+  if (cmd.verb === 'REQUEST' && cmd.target === 'AUTH') {
+    return { nextState, response: 'SS WARD: "Authorization granted. Proceed."' };
+  }
 
   switch (cmd.verb) {
     case 'SCRAM':
@@ -55,27 +70,32 @@ export function executeCommand(cmd: ParsedCommand, state: PlantState): CommandRe
 
     case 'SET':
       if (cmd.target === 'RECIRC-A' && cmd.value !== undefined) {
-        nextState.cooling.recircPumpSpeed[0] = Math.max(0, Math.min(100, cmd.value));
-        return { nextState, response: `RECIRC-A SETPOINT: ${cmd.value}%. ADJUSTING.` };
+        nextState.equipment['RECIRC-A'].targetSetpoint = Math.max(0, Math.min(100, cmd.value));
+        nextState.equipment['RECIRC-A'].ramping = true;
+        return { nextState, response: `RECIRC-A SETPOINT: ${cmd.value}%. ADJUSTING...` };
       }
       if (cmd.target === 'RECIRC-B' && cmd.value !== undefined) {
-        nextState.cooling.recircPumpSpeed[1] = Math.max(0, Math.min(100, cmd.value));
-        return { nextState, response: `RECIRC-B SETPOINT: ${cmd.value}%. ADJUSTING.` };
+        nextState.equipment['RECIRC-B'].targetSetpoint = Math.max(0, Math.min(100, cmd.value));
+        nextState.equipment['RECIRC-B'].ramping = true;
+        return { nextState, response: `RECIRC-B SETPOINT: ${cmd.value}%. ADJUSTING...` };
       }
       if (cmd.target === 'FW-FLOW' && cmd.value !== undefined) {
-        nextState.secondary.feedwaterFlow = Math.max(0, cmd.value);
-        return { nextState, response: `FEEDWATER FLOW SETPOINT: ${cmd.value} kg/s.` };
+        nextState.equipment['FW-PUMP-A'].targetSetpoint = Math.max(0, cmd.value / 2);
+        nextState.equipment['FW-PUMP-B'].targetSetpoint = Math.max(0, cmd.value / 2);
+        nextState.equipment['FW-PUMP-A'].ramping = true;
+        nextState.equipment['FW-PUMP-B'].ramping = true;
+        return { nextState, response: `FEEDWATER FLOW SETPOINT: ${cmd.value} kg/s. PUMPS RAMPING...` };
       }
       return { nextState, response: 'UNKNOWN TARGET OR MISSING VALUE FOR SET COMMAND.' };
 
     case 'START':
       if (cmd.target === 'RCIC') {
         nextState.flags.rcicRunning = true;
-        return { nextState, response: 'RCIC STARTED MANUALLY.' };
+        return { nextState, response: 'RCIC STARTED MANUALLY. FLOW ESTABLISHED.' };
       }
       if (cmd.target === 'HPCI') {
         nextState.flags.hpciRunning = true;
-        return { nextState, response: 'HPCI STARTED MANUALLY.' };
+        return { nextState, response: 'HPCI STARTED MANUALLY. TURBINE SPINNING UP.' };
       }
       if (cmd.target === 'LPCI') {
         if (nextState.cooling.rpvPressure > 0.375) {
@@ -165,7 +185,7 @@ export function executeCommand(cmd: ParsedCommand, state: PlantState): CommandRe
       if (cmd.target === 'ADS') {
         nextState.flags.adsActivated = true;
         nextState.flags.srvOpen = nextState.flags.srvOpen.map(() => true);
-        return { nextState, response: 'ADS INITIATED MANUALLY. ALL SRVs OPENED.' };
+        return { nextState, response: 'ADS INITIATED MANUALLY. ALL SRVs OPENED. DEPRESSURIZATION IN PROGRESS.' };
       }
       return { nextState, response: 'UNKNOWN INITIATION TARGET.' };
 
@@ -186,7 +206,7 @@ export function executeCommand(cmd: ParsedCommand, state: PlantState): CommandRe
     case 'STATUS':
       return {
         nextState,
-        response: `CORE POWER: ${nextState.core.thermalPower.toFixed(0)} MWt | RPV LEVEL: ${nextState.cooling.rpvWaterLevel.toFixed(1)}% | RPV PRESS: ${nextState.cooling.rpvPressure.toFixed(2)} MPa | FUEL TEMP: ${nextState.core.fuelTemperature.toFixed(0)}°C`
+        response: `CORE POWER: ${nextState.core.thermalPower.toFixed(0)} MWt | RPV LEVEL (IND): ${nextState.instruments.rpvWaterLevel.displayValue}% | RPV PRESS (IND): ${nextState.instruments.rpvPressure.displayValue} MPa`
       };
 
     case 'ALARMS':
@@ -209,8 +229,6 @@ export function executeCommand(cmd: ParsedCommand, state: PlantState): CommandRe
         const channelMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
         const idx = channelMap[channelStr];
         if (idx !== undefined) {
-          nextState.flags.rpsChannelFault[idx] = true; // Bypassing effectively marks it faulted in this simple model or clears it
-          // Wait, bypassing means it's ignored. Let's just say it's cleared for simplicity
           nextState.flags.rpsChannelFault[idx] = false;
           return { nextState, response: `RPS CHANNEL ${channelStr} BYPASSED.` };
         }
@@ -226,7 +244,7 @@ export function executeCommand(cmd: ParsedCommand, state: PlantState): CommandRe
       }
       return {
         nextState,
-        response: 'COMMANDS:\nSCRAM\nINSERT/WITHDRAW RODS [n%]\nSET RECIRC-A/B [n%]\nSTART/STOP RCIC/HPCI/LPCI/CORE-SPRAY\nOPEN/CLOSE BYPASS-VALVE/SRV-[1-8]/MSIV\nINITIATE ADS\nACK [CODE]/ALL\nSTATUS\nALARMS\nLOG\nTIME\nCREW\nHELP [TOPIC]'
+        response: 'COMMANDS:\nSCRAM, INSERT/WITHDRAW RODS [n%], SET RECIRC-A/B [n%], START/STOP RCIC/HPCI/LPCI/CORE-SPRAY, OPEN/CLOSE BYPASS-VALVE/SRV-[1-8]/MSIV, INITIATE ADS, ACK [CODE]/ALL, STATUS, ALARMS, LOG, TIME, CREW, HELP [TOPIC]'
       };
 
     case 'TIME':
@@ -253,7 +271,6 @@ export function executeCommand(cmd: ParsedCommand, state: PlantState): CommandRe
     case 'LOAD':
       if (cmd.target === 'DIESEL') {
         if (!nextState.flags.dieselGeneratorRunning) return { nextState, response: 'DIESEL MUST BE RUNNING TO LOAD.' };
-        // We don't have a distinct loaded flag in state, we'll assume it powers up the AC instantly
         return { nextState, response: 'ELECTRICAL LOADS TRANSFERRED TO DIESEL GENERATOR.' };
       }
       return { nextState, response: 'SYNTAX: LOAD DIESEL' };

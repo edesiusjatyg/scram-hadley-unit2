@@ -2,15 +2,20 @@
 
 import { useGameStore } from '../store/gameStore';
 import { THRESHOLDS } from '../lib/simulation/constants';
-import { PlantState } from '../types/plant';
 
 export default function PlantStatusPanel() {
   const { plant } = useGameStore();
 
-  const getColor = (val: number, alertLow: number, alertHigh: number, scramLow: number, scramHigh: number) => {
+  const getColor = (val: number | string, alertLow: number, alertHigh: number, scramLow: number, scramHigh: number) => {
+    if (typeof val === 'string') return 'text-[#ffaa00]'; // Missing/failed state might be yellow or blink
     if (val <= scramLow || val >= scramHigh) return 'text-[#ff4444]';
     if (val <= alertLow || val >= alertHigh) return 'text-[#ffaa00]';
     return 'text-[#33ff33]';
+  };
+
+  const formatInst = (val: number | string, decimals: number = 0) => {
+    if (typeof val === 'string') return val;
+    return val.toFixed(decimals);
   };
 
   const getEccsColor = (running: boolean) => running ? 'text-[#33ff33]' : 'text-[#1a7a1a]';
@@ -27,8 +32,8 @@ export default function PlantStatusPanel() {
         </div>
         <div>
           <span className="inline-block w-32">NEUTRON FLUX</span>: 
-          <span className={getColor(plant.core.neutronFlux, 95, 105, 0, THRESHOLDS.CORE.FLUX_SCRAM)}>
-            {' '}{plant.core.neutronFlux.toFixed(1)}%
+          <span className={getColor(plant.instruments.neutronFlux.displayValue, 95, 105, 0, THRESHOLDS.CORE.FLUX_SCRAM)}>
+            {' '}{formatInst(plant.instruments.neutronFlux.displayValue, 1)}%
           </span>
         </div>
         <div>
@@ -61,32 +66,38 @@ export default function PlantStatusPanel() {
         <div className="underline mb-1">PRIMARY COOLING</div>
         <div>
           <span className="inline-block w-32">RPV LEVEL</span>: 
-          <span className={getColor(plant.cooling.rpvWaterLevel, THRESHOLDS.COOLING.LEVEL_L3, THRESHOLDS.COOLING.LEVEL_L5, THRESHOLDS.COOLING.LEVEL_L2, THRESHOLDS.COOLING.LEVEL_SCRAM_HIGH)}>
-            {' '}{plant.cooling.rpvWaterLevel.toFixed(1)}%
+          <span className={getColor(plant.instruments.rpvWaterLevel.displayValue, THRESHOLDS.COOLING.LEVEL_L3, THRESHOLDS.COOLING.LEVEL_L5, THRESHOLDS.COOLING.LEVEL_L2, THRESHOLDS.COOLING.LEVEL_SCRAM_HIGH)}>
+            {' '}{formatInst(plant.instruments.rpvWaterLevel.displayValue, 1)}%
           </span>
         </div>
         <div>
           <span className="inline-block w-32">RPV PRESS</span>: 
-          <span className={getColor(plant.cooling.rpvPressure, THRESHOLDS.COOLING.PRESSURE_ALERT_LOW, THRESHOLDS.COOLING.PRESSURE_ALERT_HIGH, THRESHOLDS.COOLING.PRESSURE_SCRAM_LOW, THRESHOLDS.COOLING.PRESSURE_SCRAM_HIGH)}>
-            {' '}{plant.cooling.rpvPressure.toFixed(2)} MPa
+          <span className={getColor(plant.instruments.rpvPressure.displayValue, THRESHOLDS.COOLING.PRESSURE_ALERT_LOW, THRESHOLDS.COOLING.PRESSURE_ALERT_HIGH, THRESHOLDS.COOLING.PRESSURE_SCRAM_LOW, THRESHOLDS.COOLING.PRESSURE_SCRAM_HIGH)}>
+            {' '}{formatInst(plant.instruments.rpvPressure.displayValue, 2)} MPa
           </span>
         </div>
         <div>
           <span className="inline-block w-32">RECIRC-A</span>: 
-          <span className={getColor(plant.cooling.recircPumpSpeed[0], THRESHOLDS.COOLING.RECIRC_ALERT, 101, THRESHOLDS.COOLING.RECIRC_SCRAM, 101)}>
-            {' '}{plant.cooling.recircPumpSpeed[0].toFixed(0)}%
+          <span className={getColor(plant.instruments.recircPumpSpeedA.displayValue, THRESHOLDS.COOLING.RECIRC_ALERT, 101, THRESHOLDS.COOLING.RECIRC_SCRAM, 101)}>
+            {' '}{formatInst(plant.instruments.recircPumpSpeedA.displayValue, 0)}%
           </span>
         </div>
         <div>
           <span className="inline-block w-32">RECIRC-B</span>: 
-          <span className={getColor(plant.cooling.recircPumpSpeed[1], THRESHOLDS.COOLING.RECIRC_ALERT, 101, THRESHOLDS.COOLING.RECIRC_SCRAM, 101)}>
-            {' '}{plant.cooling.recircPumpSpeed[1].toFixed(0)}%
+          <span className={getColor(plant.instruments.recircPumpSpeedB.displayValue, THRESHOLDS.COOLING.RECIRC_ALERT, 101, THRESHOLDS.COOLING.RECIRC_SCRAM, 101)}>
+            {' '}{formatInst(plant.instruments.recircPumpSpeedB.displayValue, 0)}%
           </span>
         </div>
         <div>
           <span className="inline-block w-32">DRYWELL</span>: 
-          <span className={getColor(plant.cooling.drywellPressure, -1, THRESHOLDS.COOLING.DRYWELL_ALERT, -1, THRESHOLDS.COOLING.DRYWELL_SCRAM)}>
-            {' '}{plant.cooling.drywellPressure.toFixed(1)} kPa
+          <span className={getColor(plant.instruments.drywellPressure.displayValue, -1, THRESHOLDS.COOLING.DRYWELL_ALERT, -1, THRESHOLDS.COOLING.DRYWELL_SCRAM)}>
+            {' '}{formatInst(plant.instruments.drywellPressure.displayValue, 1)} kPa
+          </span>
+        </div>
+        <div>
+          <span className="inline-block w-32">POOL TEMP</span>: 
+          <span className={getColor(plant.cooling.suppressionPoolTemp, -1, THRESHOLDS.COOLING.POOL_TEMP_ALERT, -1, THRESHOLDS.COOLING.POOL_TEMP_SCRAM)}>
+            {' '}{plant.cooling.suppressionPoolTemp.toFixed(1)} °C
           </span>
         </div>
       </div>
@@ -101,8 +112,8 @@ export default function PlantStatusPanel() {
         </div>
         <div>
           <span className="inline-block w-32">FW FLOW</span>: 
-          <span className={getColor(plant.secondary.feedwaterFlow, THRESHOLDS.SECONDARY.FW_FLOW_ALERT_LOW, THRESHOLDS.SECONDARY.FW_FLOW_ALERT_HIGH, THRESHOLDS.SECONDARY.FW_FLOW_ALARM, 9999)}>
-            {' '}{plant.secondary.feedwaterFlow.toFixed(0)} kg/s
+          <span className={getColor(plant.instruments.feedwaterFlow.displayValue, THRESHOLDS.SECONDARY.FW_FLOW_ALERT_LOW, THRESHOLDS.SECONDARY.FW_FLOW_ALERT_HIGH, THRESHOLDS.SECONDARY.FW_FLOW_ALARM, 9999)}>
+            {' '}{formatInst(plant.instruments.feedwaterFlow.displayValue, 0)} kg/s
           </span>
         </div>
         <div>

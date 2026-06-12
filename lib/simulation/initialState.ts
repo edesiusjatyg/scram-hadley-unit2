@@ -64,5 +64,26 @@ export const generateInitialState = (): PlantState => ({
   events: {
     activeEvents: [],
     eventPool: [], // populated later
+    countdowns: [],
   },
+  instruments: {
+    rpvWaterLevel: { parameterId: 'rpvWaterLevel', failureMode: null, failedAtTick: null, displayValue: 63, trueValue: 63 },
+    rpvPressure: { parameterId: 'rpvPressure', failureMode: null, failedAtTick: null, displayValue: 7.21, trueValue: 7.21 },
+    neutronFlux: { parameterId: 'neutronFlux', failureMode: null, failedAtTick: null, displayValue: 100, trueValue: 100 },
+    feedwaterFlow: { parameterId: 'feedwaterFlow', failureMode: null, failedAtTick: null, displayValue: 1812, trueValue: 1812 },
+    drywellPressure: { parameterId: 'drywellPressure', failureMode: null, failedAtTick: null, displayValue: 1.2, trueValue: 1.2 },
+    recircPumpSpeedA: { parameterId: 'recircPumpSpeedA', failureMode: null, failedAtTick: null, displayValue: 100, trueValue: 100 },
+    recircPumpSpeedB: { parameterId: 'recircPumpSpeedB', failureMode: null, failedAtTick: null, displayValue: 100, trueValue: 100 },
+  },
+  equipment: {
+    'FW-PUMP-A': { id: 'FW-PUMP-A', healthPercent: 100, degradationRate: 0.1, failureProbability: 0.01, breakerTripped: false, targetSetpoint: 1812, currentValue: 1812, ramping: false },
+    'FW-PUMP-B': { id: 'FW-PUMP-B', healthPercent: 100, degradationRate: 0.1, failureProbability: 0.01, breakerTripped: false, targetSetpoint: 1812, currentValue: 1812, ramping: false },
+    'RCIC': { id: 'RCIC', healthPercent: 100, degradationRate: 0.05, failureProbability: 0.01, breakerTripped: false, ramping: false },
+    'HPCI': { id: 'HPCI', healthPercent: 100, degradationRate: 0.05, failureProbability: 0.01, breakerTripped: false, ramping: false },
+    'RECIRC-A': { id: 'RECIRC-A', healthPercent: 100, degradationRate: 0.05, failureProbability: 0.01, breakerTripped: false, targetSetpoint: 100, currentValue: 100, ramping: false },
+    'RECIRC-B': { id: 'RECIRC-B', healthPercent: 100, degradationRate: 0.05, failureProbability: 0.01, breakerTripped: false, targetSetpoint: 100, currentValue: 100, ramping: false },
+  },
+  difficulty: 'NORMAL',
+  activeProcedure: undefined,
+  pendingAroCommand: undefined,
 });

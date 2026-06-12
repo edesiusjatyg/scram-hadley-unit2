@@ -3,55 +3,73 @@ import { PlantState } from '../../types/plant';
 export interface ScoreBreakdown {
   baseScore: number;
   scramPenalty: number;
-  alarmManagement: number;
+  unnecessaryEccsPenalty: number;
+  instrumentIgnorePenalty: number;
+  alarmTriageScore: number;
   procedureCompliance: number;
-  stabilityBonus: number;
-  efficiencyBonus: number;
+  consequenceManagement: number;
+  crisisBonus: number;
+  cleanShiftBonus: number;
   total: number;
   grade: string;
 }
 
 export const calculateScore = (state: PlantState): ScoreBreakdown => {
   let baseScore = 1000;
-  let scramPenalty = state.flags.scramSignalActive ? -100 : 0;
   
-  // Calculate alarm management score
-  let alarmManagement = 0;
+  let scramPenalty = state.flags.scramSignalActive ? -150 : 0;
+  
+  // Basic heuristics for these new metrics:
+  let unnecessaryEccsPenalty = 0; // Simplified
+  let instrumentIgnorePenalty = 0; // Simplified
+  
+  let alarmTriageScore = 0;
   state.alarms.forEach(a => {
-    // Highly simplified: assuming acknowledged means it was managed okay for now.
-    // In a full tracker we'd check how many ticks it took to acknowledge.
     if (a.acknowledged) {
-      alarmManagement += 5;
+      if (a.code.startsWith('A-')) alarmTriageScore += 10;
+      else if (a.code.startsWith('B-')) alarmTriageScore += 5;
+      else alarmTriageScore += 2;
     } else {
-      alarmManagement -= 10;
+      alarmTriageScore -= 20;
     }
   });
 
-  // Simplified bonuses
-  let stabilityBonus = (state.flags.scramSignalActive || state.alarms.length > 5) ? 0 : 200;
-  let efficiencyBonus = (state.flags.rcicRunning || state.flags.hpciRunning || state.flags.lpciRunning || state.flags.coreSprayRunning) ? 0 : 100;
+  let procedureCompliance = state.flags.scramSignalActive ? 75 : 0; // Simplified
 
-  // Simplified procedure compliance
-  let procedureCompliance = 0;
-  if (state.flags.scramSignalActive && state.core.rodPosition === 0) {
-    procedureCompliance += 50; // successfully scrammed
+  let consequenceManagement = 0;
+  if (state.cooling.suppressionPoolTemp <= 50) consequenceManagement += 150;
+  
+  let equipmentIntact = true;
+  Object.values(state.equipment).forEach(eq => {
+    if (eq.healthPercent < 60) equipmentIntact = false;
+  });
+  if (equipmentIntact) consequenceManagement += 100;
+
+  let crisisBonus = state.events.activeEvents.length > 2 ? 300 : 0;
+  
+  let cleanShiftBonus = 0;
+  if (!state.flags.scramSignalActive && !state.flags.hpciRunning && !state.flags.rcicRunning && state.events.activeEvents.length === 0) {
+    cleanShiftBonus = 200;
   }
 
-  let total = baseScore + scramPenalty + alarmManagement + procedureCompliance + stabilityBonus + efficiencyBonus;
+  let total = baseScore + scramPenalty + unnecessaryEccsPenalty + instrumentIgnorePenalty + alarmTriageScore + procedureCompliance + consequenceManagement + crisisBonus + cleanShiftBonus;
 
   let grade = 'F';
-  if (total >= 1300) grade = 'A';
+  if (total >= 1800) grade = 'S';
+  else if (total >= 1400) grade = 'A';
   else if (total >= 1000) grade = 'B';
-  else if (total >= 800) grade = 'C';
-  else if (total >= 500) grade = 'D';
+  else if (total >= 600) grade = 'C';
 
   return {
     baseScore,
     scramPenalty,
-    alarmManagement,
+    unnecessaryEccsPenalty,
+    instrumentIgnorePenalty,
+    alarmTriageScore,
     procedureCompliance,
-    stabilityBonus,
-    efficiencyBonus,
+    consequenceManagement,
+    crisisBonus,
+    cleanShiftBonus,
     total,
     grade
   };

@@ -1,4 +1,4 @@
-import { PlantState, ShiftEventState } from '../../types/plant';
+import { PlantState } from '../../types/plant';
 import { THRESHOLDS } from './constants';
 
 export interface ShiftEvent {
@@ -6,7 +6,10 @@ export interface ShiftEvent {
   triggerTick: number;
   severity: 'minor' | 'moderate' | 'major' | 'critical';
   announcementText: string;
-  alarmCode: string;
+  alarmsToTrigger: string[];
+  countdown?: number; // ticks
+  countdownFailState?: string;
+  countdownAlarmCode?: string;
   stateChanges: (state: PlantState) => PlantState;
 }
 
@@ -16,22 +19,13 @@ const EVENT_POOL: ShiftEvent[] = [
     triggerTick: 60,
     severity: 'minor',
     announcementText: 'FEEDWATER PUMP B HAS TRIPPED.',
-    alarmCode: 'B-04 FEEDWATER FLOW LOW',
+    alarmsToTrigger: ['B-04 FEEDWATER FLOW LOW', 'B-05 FW PUMP TRIP'],
+    countdown: 240, // 4 mins
+    countdownFailState: 'CORE LEVEL L2',
+    countdownAlarmCode: 'B-04 FEEDWATER FLOW LOW',
     stateChanges: (state) => {
       const next = JSON.parse(JSON.stringify(state)) as PlantState;
       next.flags.feedwaterPump[1] = false;
-      return next;
-    }
-  },
-  {
-    id: 'RECIRC-A-RUNBACK',
-    triggerTick: 120,
-    severity: 'minor',
-    announcementText: 'RECIRC PUMP A SPEED DEVIATION DETECTED.',
-    alarmCode: 'B-05 RECIRC PUMP TRIP',
-    stateChanges: (state) => {
-      const next = JSON.parse(JSON.stringify(state)) as PlantState;
-      next.cooling.recircPumpSpeed[0] = 60;
       return next;
     }
   },
@@ -40,7 +34,10 @@ const EVENT_POOL: ShiftEvent[] = [
     triggerTick: 150,
     severity: 'moderate',
     announcementText: 'CONDENSER VACUUM DEGRADING. PRESSURE RISING.',
-    alarmCode: 'B-07 CONDENSER VACUUM LOSS',
+    alarmsToTrigger: ['B-07 CONDENSER VACUUM LOSS'],
+    countdown: 150, // 2:30 mins
+    countdownFailState: 'TURBINE TRIP',
+    countdownAlarmCode: 'B-07 CONDENSER VACUUM LOSS',
     stateChanges: (state) => {
       const next = JSON.parse(JSON.stringify(state)) as PlantState;
       next.secondary.condenserVacuum = 84;
@@ -49,14 +46,23 @@ const EVENT_POOL: ShiftEvent[] = [
     }
   },
   {
-    id: 'TURBINE-TRIP',
+    id: 'TURBINE-TRIP', // E.g., if triggered directly
     triggerTick: 180,
     severity: 'major',
     announcementText: 'GRID DISTURBANCE DETECTED. TURBINE TRIP.',
-    alarmCode: 'B-06 TURBINE TRIP',
+    alarmsToTrigger: [
+      'B-06 TURBINE TRIP — OVERSPEED',
+      'B-02 RPV PRESSURE HIGH',
+      'A-01 MSIV CLOSURE — SCRAM SIGNAL'
+    ],
+    countdown: 90, // 1:30 mins
+    countdownFailState: 'PRESSURE EXCURSION',
+    countdownAlarmCode: 'B-02 RPV PRESSURE HIGH',
     stateChanges: (state) => {
       const next = JSON.parse(JSON.stringify(state)) as PlantState;
       next.secondary.turbineValvePosition = 0;
+      next.flags.scramSignalActive = true;
+      next.flags.msivOpen = false;
       return next;
     }
   },
@@ -65,7 +71,10 @@ const EVENT_POOL: ShiftEvent[] = [
     triggerTick: 200,
     severity: 'critical',
     announcementText: 'LOSS OF OFFSITE POWER DETECTED.',
-    alarmCode: 'A-04 LOSS OF OFFSITE POWER',
+    alarmsToTrigger: ['A-04 LOSS OF OFFSITE POWER', 'C-04 DIESEL START SIGNAL'],
+    countdown: 480, // 8 mins
+    countdownFailState: 'BATTERY DEPLETION',
+    countdownAlarmCode: 'A-04 LOSS OF OFFSITE POWER',
     stateChanges: (state) => {
       const next = JSON.parse(JSON.stringify(state)) as PlantState;
       next.flags.offSitePowerAvailable = false;
@@ -73,42 +82,29 @@ const EVENT_POOL: ShiftEvent[] = [
     }
   },
   {
-    id: 'LOCA-SMALL',
-    triggerTick: 240,
-    severity: 'critical',
-    announcementText: 'HIGH DRYWELL PRESSURE INDICATED. POSSIBLE SMALL BREAK LOCA.',
-    alarmCode: 'A-03 HIGH DRYWELL PRESSURE',
-    stateChanges: (state) => {
-      const next = JSON.parse(JSON.stringify(state)) as PlantState;
-      next.cooling.drywellPressure = 15;
-      return next;
-    }
-  },
-  {
-    id: 'RPS-CHANNEL-FAULT',
-    triggerTick: 45,
+    id: 'INSTRUMENT-FAILURE-LEVEL',
+    triggerTick: 100,
     severity: 'minor',
-    announcementText: 'RPS CHANNEL B SPURIOUS FAULT.',
-    alarmCode: 'C-01 RPS CHANNEL FAULT',
+    announcementText: 'INSTRUMENT FAULT DETECTED.',
+    alarmsToTrigger: ['C-05 INSTRUMENT FAULT — RPV LEVEL NARROW RANGE'],
     stateChanges: (state) => {
       const next = JSON.parse(JSON.stringify(state)) as PlantState;
-      next.flags.rpsChannelFault[1] = true;
+      next.instruments.rpvWaterLevel.failureMode = 'missing';
+      next.instruments.rpvWaterLevel.failedAtTick = next.clock.tickCount;
       return next;
     }
   }
 ];
 
 export const generateShiftEvents = (): string[] => {
-  // A typical shift selects 3-5 events
-  // For simplicity, we just return a static list of 3 events for a "normal" difficulty
-  return ['FW-PUMP-B-TRIP', 'CONDENSER-VAC-LOSS', 'SBO'];
+  return ['FW-PUMP-B-TRIP', 'INSTRUMENT-FAILURE-LEVEL', 'CONDENSER-VAC-LOSS', 'SBO'];
 };
 
 export const applyShiftEvents = (state: PlantState): PlantState => {
   let nextState = JSON.parse(JSON.stringify(state)) as PlantState;
   
   if (!nextState.events) {
-    nextState.events = { activeEvents: [], eventPool: generateShiftEvents() };
+    nextState.events = { activeEvents: [], eventPool: generateShiftEvents(), countdowns: [] };
   }
 
   const currentTick = nextState.clock.tickCount;
@@ -125,6 +121,23 @@ export const applyShiftEvents = (state: PlantState): PlantState => {
       remainingEvents.splice(remainingEvents.indexOf(eventId), 1);
       nextState.events.activeEvents.push(eventId);
       
+      // Trigger alarms cascade
+      eventDef.alarmsToTrigger.forEach(code => {
+        if (!nextState.alarms.find(a => a.code === code)) {
+          nextState.alarms.push({ code, acknowledged: false, tickFired: currentTick });
+        }
+      });
+
+      // Add countdown if exists
+      if (eventDef.countdown && eventDef.countdownFailState && eventDef.countdownAlarmCode) {
+        nextState.events.countdowns.push({
+          eventId: eventDef.id,
+          ticksRemaining: eventDef.countdown,
+          failState: eventDef.countdownFailState,
+          alarmCode: eventDef.countdownAlarmCode
+        });
+      }
+
       // Log event
       nextState.logs.push({
         tick: currentTick,
@@ -134,8 +147,27 @@ export const applyShiftEvents = (state: PlantState): PlantState => {
       });
     }
   }
-
   nextState.events.eventPool = remainingEvents;
+
+  // Process countdowns
+  const activeCountdowns = [...nextState.events.countdowns];
+  for (let i = activeCountdowns.length - 1; i >= 0; i--) {
+    const cd = activeCountdowns[i];
+    cd.ticksRemaining -= 1;
+    if (cd.ticksRemaining <= 0) {
+      // Fail state reached
+      nextState.logs.push({
+        tick: currentTick,
+        gameTime: formatGameTime(nextState.clock.gameTimeMinutes),
+        message: `CRITICAL TIMER EXPIRED: ${cd.failState}`,
+        type: 'alarm'
+      });
+      // In a real implementation, we'd trigger the fail state logic here if not already handled by physics.
+      activeCountdowns.splice(i, 1);
+    }
+  }
+  nextState.events.countdowns = activeCountdowns;
+
   return nextState;
 };
 

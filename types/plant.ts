@@ -35,9 +35,9 @@ export interface SecondaryLoop {
 
 export interface SystemFlags {
   // Valves
-  msivOpen: boolean;            // Main Steam Isolation Valves
-  bypassValveOpen: boolean;     // Steam Bypass to Condenser
-  srvOpen: boolean[];           // Safety Relief Valves [0..7]
+  msivOpen: boolean;            
+  bypassValveOpen: boolean;     
+  srvOpen: boolean[];           
   adsActivated: boolean;
   
   // ECCS
@@ -47,19 +47,19 @@ export interface SystemFlags {
   coreSprayRunning: boolean;
   
   // Pumps
-  recircPump: [boolean, boolean];     // [A, B]
-  feedwaterPump: [boolean, boolean];  // [A, B]
+  recircPump: [boolean, boolean];     
+  feedwaterPump: [boolean, boolean];  
   condensatePump: boolean;
   
   // Power
   offSitePowerAvailable: boolean;
   dieselGeneratorRunning: boolean;
   batteryDcAvailable: boolean;
-  batteryChargePercent: number;       // 0-100%
+  batteryChargePercent: number;       
   
   // Protection
   scramSignalActive: boolean;
-  rpsChannelFault: [boolean, boolean, boolean, boolean]; // 4 RPS channels
+  rpsChannelFault: [boolean, boolean, boolean, boolean]; 
 }
 
 export interface ActiveAlarm {
@@ -75,9 +75,38 @@ export interface LogEntry {
   type: 'routine' | 'alarm' | 'crew' | 'command';
 }
 
+export interface ActiveCountdown {
+  eventId: string;
+  ticksRemaining: number;
+  failState: string;
+  alarmCode: string;
+}
+
 export interface ShiftEventState {
   activeEvents: string[]; // IDs of active events
   eventPool: string[]; // IDs of upcoming events
+  countdowns: ActiveCountdown[];
+}
+
+export type InstrumentFailureMode = 'frozen' | 'zero' | 'noise' | 'offscale' | 'missing';
+
+export interface InstrumentState {
+  parameterId: string;
+  failureMode: InstrumentFailureMode | null;
+  failedAtTick: number | null;
+  displayValue: number | string;
+  trueValue: number;
+}
+
+export interface EquipmentHealth {
+  id: string;
+  healthPercent: number;
+  degradationRate: number;
+  failureProbability: number;
+  breakerTripped: boolean;
+  targetSetpoint?: number;
+  currentValue?: number;
+  ramping: boolean;
 }
 
 export interface PlantState {
@@ -89,4 +118,12 @@ export interface PlantState {
   alarms: ActiveAlarm[];
   logs: LogEntry[];
   events: ShiftEventState;
+  instruments: Record<string, InstrumentState>;
+  equipment: Record<string, EquipmentHealth>;
+  difficulty: 'TRAINING' | 'NORMAL' | 'SENIOR RO' | 'INCIDENT';
+  activeProcedure?: string;
+  pendingAroCommand?: {
+    command: string;
+    executeAtTick: number;
+  };
 }
