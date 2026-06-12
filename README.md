@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SCRAM: Hadley Unit 2
+
+**SCRAM: Hadley Unit 2** is a hardcore, terminal-based Boiling Water Reactor (BWR) control room simulation game. Step into the shoes of the Reactor Operator on the 0342 night shift. Your task is to maintain core stability, interpret noisy instrument readings, triage cascading alarms under intense time pressure, and manage complex system interactions to avoid a catastrophic meltdown.
+
+## Overview
+
+The simulation is built entirely as a pure functional state machine using **Next.js 15**, **TypeScript**, and **Zustand**. It features a realistic underlying physics model of a BWR and enforces a retro 1980s monochrome terminal aesthetic.
+
+### Key Features
+- **Realistic Physics Engine:** Implements core reactivity, thermodynamics, fluid dynamics, and Xenon poisoning over a 4-layer physical phenomenon cascade.
+- **Crisis Management:** Dynamic shift events trigger equipment trips, instrument failures, and cascading alarm floods. You must triage these events with real-time countdowns.
+- **Command Parser:** Type terminal commands (e.g., `SCRAM`, `SET FW-FLOW 1500`, `START RCIC`, `INITIATE ADS`) to interface with the plant.
+- **Instrument Noise & Failures:** Sensors can freeze, read zero, become noisy, or go off-scale. You must cross-reference indirect indicators to infer the plant's true state.
+- **Crew Resource Management:** Interact with Shift Supervisor Ward and your Assistant Reactor Operator (ARO). Delegate tasks and manage the shift as a team.
+- **Consequence Permanence:** Running equipment aggressively dumps heat into the Suppression Pool, permanently degrading ECCS efficiency for the remainder of the shift.
+
+## How to Play
+
+Start the simulation and begin monitoring the plant.
+1. Type `HELP` in the terminal for a list of available commands.
+2. Read the `STATUS` output and cross-check the `ALARMS`.
+3. If an alarm triggers, acknowledge it (e.g., `ACK B-04`).
+4. Resolve issues by issuing system commands (e.g., `START HPCI`, `SET RECIRC-A 90`).
+5. **Survive the shift** without triggering a meltdown or completely discharging the battery.
 
 ## Getting Started
 
-First, run the development server:
+To run the simulation locally:
 
 ```bash
+# 1. Clone the repository and navigate into the project
+cd scram/scram-hadley-unit2
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser to enter the control room.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Architecture
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The core of the game is isolated in `lib/simulation/`.
+- `types/plant.ts`: Defines the strict interfaces for the `PlantState`.
+- `cascadeLogic.ts`: Computes physics iterations and applies thermodynamics and decay heat.
+- `simulationTick.ts`: The main orchestration loop for events, crew dialogue, alarms, and physics.
+- `parser/commandExecutor.ts`: Executes valid terminal commands parsed from user input.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+*Created as an advanced agentic coding exploration of rigorous state machine mechanics.*
